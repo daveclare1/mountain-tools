@@ -27,7 +27,7 @@ def load_polygons():
 
 def assign_forecast(df_row, fl, fh, sm, sb):
     if df_row.ELEV_MIN < sb:
-        return 0
+        return '0'
 
     if df_row.ELEV_MIN < sm:
         return fl[df_row.aspect-1]
@@ -36,14 +36,19 @@ def assign_forecast(df_row, fl, fh, sm, sb):
 
 st.set_page_config(layout="wide")
 st.title("SAIS Tool")
+st.markdown(
+    """
+    Use the controls on the left to define the SAIS avalanche map you want.
+    All areas on the map will be coloured accordingly. Numbers 0-4 represent green to black,
+    counted around from N to NW. 
+    """)
 
-cols = st.columns([3,3,2])
-forecast_high = cols[0].text_input("High Elevation Forecast", value="00000000", max_chars=8)
-elev_split = cols[0].number_input("Elevation Split", value=700, step=100)
-forecast_low = cols[1].text_input("Low Elevation Forecast", value="00000000", max_chars=8)
-elev_bottom = cols[1].number_input("Minimum Elevation", value=400, step=100)
+elev_split = st.sidebar.number_input("Elevation Split", value=700, step=100)
+elev_bottom = st.sidebar.number_input("Minimum Elevation", value=400, step=100)
+forecast_high = st.sidebar.text_input("High Elevation Forecast", value="00000000", max_chars=8)
+forecast_low = st.sidebar.text_input("Low Elevation Forecast", value="00000000", max_chars=8)
 
-cols[2].image(forecast_string_to_url(forecast_low, forecast_high, elev_split, elev_bottom))
+st.sidebar.image(forecast_string_to_url(forecast_low, forecast_high, elev_split, elev_bottom))
 
 map_df, geojson = load_polygons()
 
@@ -63,7 +68,17 @@ fig = px.choropleth_mapbox(map_df, geojson=geojson,
                     )
 
 fig.update_geos(fitbounds="geojson", visible=True)
-# fig.update_traces(marker_line_width=0)
-fig.update_layout(showlegend=False)
+fig.update_traces(marker_line_width=0)
+fig.update_layout(showlegend=False, height=600)
 
 st.plotly_chart(fig, use_container_width=True)
+
+st.markdown(
+    """
+    Important info:
+    - Elevation data is the EU-DEM v1.1 dataset from [Copernicus](https://land.copernicus.eu/imagery-in-situ/eu-dem/eu-dem-v1.1)
+    - The coloured slopes are angled 25-50 deg
+    - The resolution of the dataset is low. Slope boundaries are loose!
+    - For goodness sake use common sense
+    """
+)
