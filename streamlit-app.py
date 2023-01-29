@@ -3,6 +3,8 @@ import plotly.express as px
 import geopandas as gpd
 import json
 
+FILENAME = "cairngorms_avi_zones_4326.gpkg"
+
 forecast_colors = {
     "0": 'green',
     "1": 'yellow',
@@ -17,13 +19,10 @@ def forecast_string_to_url(fl, fh, sm, sb):
 
 @st.cache(allow_output_mutation=True)   # to allow adding of the forecast column
 def load_polygons():
-    fp = "cairngorms_avi_zones_4326.gpkg"
+    fp = FILENAME
     map_df = gpd.read_file(fp).set_crs("EPSG:4326", allow_override=True)
     map_df['poly_id'] = map_df.index    # Create column of unique ids
-    map_df.to_file('geojsfile.json', driver = 'GeoJSON')
-    with open('geojsfile.json') as geofile:
-        geojson_data = json.load(geofile) 
-    return map_df, geojson_data
+    return map_df
 
 def assign_forecast(df_row, fl, fh, sm, sb):
     if df_row.ELEV_MIN < sb:
@@ -35,10 +34,10 @@ def assign_forecast(df_row, fl, fh, sm, sb):
         return fh[df_row.aspect-1]
 
 st.set_page_config(layout="wide")
-st.title("SAIS Tool")
+st.title("SAIS Painting Tool")
 st.markdown(
     """
-    Use the controls on the left to define the SAIS avalanche map you want.
+    Use the controls on the left to define the avalanche map you want.
     All areas on the map will be coloured accordingly. Numbers 0-4 represent green to black,
     counted around from N to NW. 
     """)
@@ -50,20 +49,19 @@ forecast_low = st.sidebar.text_input("Low Elevation Forecast", value="00000000",
 
 st.sidebar.image(forecast_string_to_url(forecast_low, forecast_high, elev_split, elev_bottom))
 
-map_df, geojson = load_polygons()
+map_df = load_polygons()
 
 map_df['forecast'] = map_df.apply(assign_forecast, 
                                 args=(forecast_low, forecast_high, elev_split, elev_bottom),
                                 axis=1)
 
-fig = px.choropleth_mapbox(map_df, geojson=geojson, 
+fig = px.choropleth_mapbox(map_df, geojson=map_df.geometry, 
                     locations="poly_id",
                     color="forecast",
                     color_discrete_map=forecast_colors,
                     mapbox_style="stamen-terrain",
                     zoom=8, center = {"lat": 57.123, "lon": -3.670},
                     opacity=0.5,
-                    featureidkey="properties.poly_id",
                     hover_data={"aspect":True, "forecast":False, "ELEV_MIN":True, "poly_id":False}
                     )
 
@@ -78,7 +76,10 @@ st.markdown(
     Important info:
     - Elevation data is the EU-DEM v1.1 dataset from [Copernicus](https://land.copernicus.eu/imagery-in-situ/eu-dem/eu-dem-v1.1)
     - The coloured slopes are angled 25-50 deg
-    - The resolution of the dataset is low. Slope boundaries are loose!
+    - The resolution of the dataset is low (1 point per 25m). The slope calculation smooths this out too. Slope boundaries are loose!
     - For goodness sake use common sense
     """
 )
+
+with open(FILENAME, "rb") as f:
+    st.download_button("Download .gpkg of zones", f, file_name=FILENAME)
