@@ -41,7 +41,7 @@ def forecast_string_to_url(fl, fh, sm, sb):
     val = ''.join([f"{int(l)+1}{int(h)+1}00" for l, h in zip(fl, fh)])
     return f"https://www.sais.gov.uk/_compassrose/?val={val}&txts={sb}&txtm={sm}&txte=1300"
 
-@st.cache(allow_output_mutation=True)   # to allow adding of the forecast column
+@st.cache_data()   # to allow adding of the forecast column
 def load_polygons():
     fp = FILENAME
     map_df = gpd.read_file(fp).set_crs("EPSG:4326", allow_override=True)
@@ -49,7 +49,6 @@ def load_polygons():
     map_df['aspect_category'] = map_df.apply(lambda row: map_aspect_min_to_category[row.ASPECT_MIN], axis=1)
     map_df['aspect'] = map_df.apply(lambda row: aspect_names[row.aspect_category], axis=1)
     map_df['elevation'] = map_df.apply(lambda row: f"{row.ELEV_MIN:.0f}-{row.ELEV_MAX:.0f}m", axis=1)
-    print(map_df.describe())
     return map_df
 
 def assign_forecast(df_row, fl, fh, sm, sb):
@@ -69,7 +68,7 @@ st.markdown(
     All areas on the map will be coloured accordingly. Numbers 0-4 represent green, yellow, orange, red and black,
     counted around clockwise from N to NW. Make sure to set the elevation values correctly too.
 
-    Once the chart looks right, hit the button to generate the map (takes some time, and transfers a lot of data)
+    Once the chart looks right, hit the button to generate the map (takes some time)
     """)
 
 elev_split = st.sidebar.number_input("Elevation Split", value=700, step=100)
@@ -79,10 +78,9 @@ forecast_low = st.sidebar.text_input("Low Elevation Forecast", value="00000000",
 
 st.sidebar.image(forecast_string_to_url(forecast_low, forecast_high, elev_split, elev_bottom))
 
-map_df = load_polygons()
-
 if st.button('Click to draw map'):
     with st.spinner('Painting map...'):
+        map_df = load_polygons()
         map_df['forecast'] = map_df.apply(assign_forecast, 
                                         args=(forecast_low, forecast_high, elev_split, elev_bottom),
                                         axis=1)
