@@ -1,9 +1,11 @@
 import streamlit as st
 import plotly.express as px
+from plotly import graph_objects as go
 import geopandas as gpd
 import json
 
 FILENAME = "scotland_avi_zones_4326_simple.gpkg"
+# FILENAME = "cairngorms_avi_zones_4326.gpkg"
 
 forecast_colors = {
     "0": 'green',
@@ -42,13 +44,14 @@ def forecast_string_to_url(fl, fh, sm, sb):
     return f"https://www.sais.gov.uk/_compassrose/?val={val}&txts={sb}&txtm={sm}&txte=1300"
 
 @st.cache_data()   # to allow adding of the forecast column
-def load_polygons():
-    fp = FILENAME
-    map_df = gpd.read_file(fp).set_crs("EPSG:4326", allow_override=True)
+def load_polygons(filename):
+    print(f"Opening {filename}")
+    map_df = gpd.read_file(filename).set_crs("EPSG:4326", allow_override=True)
     map_df['poly_id'] = map_df.index    # Create column of unique ids
     map_df['aspect_category'] = map_df.apply(lambda row: map_aspect_min_to_category[row.ASPECT_MIN], axis=1)
     map_df['aspect'] = map_df.apply(lambda row: aspect_names[row.aspect_category], axis=1)
     map_df['elevation'] = map_df.apply(lambda row: f"{row.ELEV_MIN:.0f}-{row.ELEV_MAX:.0f}m", axis=1)
+    print(f"Polygon file opened")
     return map_df
 
 def assign_forecast(df_row, fl, fh, sm, sb):
@@ -78,9 +81,9 @@ forecast_low = st.sidebar.text_input("Low Elevation Forecast", value="00000000",
 
 st.sidebar.image(forecast_string_to_url(forecast_low, forecast_high, elev_split, elev_bottom))
 
-if st.button('Click to draw map'):
+def draw_map(polygons):
     with st.spinner('Painting map...'):
-        map_df = load_polygons()
+        map_df = polygons
         map_df['forecast'] = map_df.apply(assign_forecast, 
                                         args=(forecast_low, forecast_high, elev_split, elev_bottom),
                                         axis=1)
@@ -89,7 +92,7 @@ if st.button('Click to draw map'):
                             locations="poly_id",
                             color="forecast",
                             color_discrete_map=forecast_colors,
-                            mapbox_style="stamen-terrain",
+                            mapbox_style="open-street-map",
                             zoom=8, center = {"lat": 57.123, "lon": -3.670},
                             opacity=0.5,
                             hover_data={"aspect":True, "forecast":False, "elevation":True, "poly_id":False}
@@ -100,6 +103,13 @@ if st.button('Click to draw map'):
         fig.update_layout(showlegend=False, height=600)
 
     st.plotly_chart(fig, use_container_width=True)
+
+buttons = st.columns(5)
+if buttons[0].button('Full map'):
+    draw_map(load_polygons("scotland_avi_zones_4326_simple.gpkg"))
+
+if buttons[1].button('Cairngorms only'):
+    draw_map(load_polygons("cairngorms_avi_zones_4326.gpkg"))
 
 st.markdown(
     """
